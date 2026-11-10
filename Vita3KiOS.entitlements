@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Enable Dynamic Code Signing for JIT Compilation on iOS 16.5 -->
+    <key>dynamic-codesigning</key>
+    <true/>
+    
+    <!-- Allow debugger attachment for AltStore / SideJITServer / SideStore -->
+    <key>get-task-allow</key>
+    <true/>
+    
+    <!-- Virtual memory addressing for PS Vita memory mapping -->
+    <key>com.apple.developer.kernel.extended-virtual-addressing</key>
+    <true/>
+    
+    <!-- Increased RAM allocation limit for iOS games/emulators -->
+    <key>com.apple.developer.kernel.increased-memory-limit</key>
+    <true/>
+</dict>
+</plist>
