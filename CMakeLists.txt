@@ -21,16 +21,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ==============================================================================
-# iOS Patch Modifications for iOS 16.5 Compatibility
+# iOS Patch Modifications for iOS 16.5 Compatibility (Fix for Swift Driver)
 # ==============================================================================
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 	# iOS port (Vita3KiOS). Patched to target iOS 16.5 instead of 17.4
 	set(IOS 1)
 	set(VITA3K_PLATFORM_IOS 1)
 	add_compile_definitions(VITA3K_PLATFORM_IOS=1)
+	
+	# Set iOS Deployment Target cleanly for C, C++, and Swift via Xcode attributes
 	set(CMAKE_OSX_DEPLOYMENT_TARGET "16.5" CACHE STRING "Minimum iOS Version" FORCE)
+	set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "16.5")
 	set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/Vita3KiOS.entitlements")
-	add_compile_options("-miphoneos-version-min=16.5")
+	
 	add_definitions(-DMAP_JIT)
 else()
 	set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3)
