@@ -46,8 +46,8 @@ if [[ -n "$seed" ]]; then
 import re, sys
 entries = []
 for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
-    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*):INTERNAL=(.*)$", line.rstrip("
-"))
+    line = line.strip()
+    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*):INTERNAL=(.*)$", line)
     if not m:
         continue
     name, value = m.groups()
@@ -159,8 +159,6 @@ fi
 rm -rf "$icon_work"
 
 # ---- Version ----
-# Marketing version: VITA3KIOS_VERSION, else a v1.2.3 tag being built, else the default in ios_bundle.cmake.
-# Build number: the CI run number, so every IPA installs over the previous one as an update.
 version="${VITA3KIOS_VERSION:-}"
 if [[ -z "$version" && "${GITHUB_REF_TYPE:-}" == tag && "${GITHUB_REF_NAME:-}" == v* ]]; then
     version="${GITHUB_REF_NAME#v}"
@@ -171,7 +169,6 @@ fi
 version="$("$pb" -c "Print :CFBundleShortVersionString" "$plist")"
 build_number="${GITHUB_RUN_NUMBER:-$(git -C "$repo_root" rev-list --count HEAD)}"
 "$pb" -c "Set :CFBundleVersion $build_number" "$plist"
-# The extension's versions must match the app's
 for appex_plist in "$app_path"/PlugIns/*.appex/Info.plist; do
     [[ -f "$appex_plist" ]] || continue
     "$pb" -c "Set :CFBundleVersion $build_number" "$appex_plist"
