@@ -13,6 +13,9 @@ config="${BUILD_CONFIG:-Release}"
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 build_dir="${repo_root}/build/ios"
 
+export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-16.5}"
+export CMAKE_OSX_DEPLOYMENT_TARGET="${CMAKE_OSX_DEPLOYMENT_TARGET:-16.5}"
+
 : "${VCPKG_ROOT:?VCPKG_ROOT must point at a bootstrapped vcpkg checkout}"
 
 # Results of CMake's feature checks from an earlier build (see ios.yml). With the Xcode generator
@@ -26,6 +29,7 @@ fi
 
 cmake ${seed_args[@]+"${seed_args[@]}"} -S "$repo_root" -B "$build_dir" -G Xcode \
     -DCMAKE_SYSTEM_NAME=iOS \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=16.5 \
     -DCMAKE_OSX_ARCHITECTURES=arm64 \
     -DCMAKE_SYSTEM_PROCESSOR=arm64 \
     -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
@@ -42,15 +46,18 @@ if [[ -n "$seed" ]]; then
 import re, sys
 entries = []
 for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
-    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*):INTERNAL=(.*)$", line.rstrip("\n"))
+    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*):INTERNAL=(.*)$", line.rstrip("
+"))
     if not m:
         continue
     name, value = m.groups()
     if name.startswith(("CMAKE_", "Z_VCPKG", "VCPKG", "FETCHCONTENT")) or "/" in value or "$" in value:
         continue
-    value = value.replace("\\", "\\\\").replace('"', '\\"')
+    value = value.replace("\", "\\").replace('"', '\"')
     entries.append(f'set({name} "{value}" CACHE INTERNAL "")')
-open(sys.argv[2], "w").write("\n".join(entries) + "\n")
+open(sys.argv[2], "w").write("
+".join(entries) + "
+")
 print(f"Saved {len(entries)} CMake check results")
 PY
 fi
@@ -72,6 +79,7 @@ xcodebuild \
     -target vita3k \
     -configuration "$config" \
     -sdk iphoneos \
+    IPHONEOS_DEPLOYMENT_TARGET=16.5 \
     -parallelizeTargets \
     -jobs "$(sysctl -n hw.ncpu)" \
     CODE_SIGNING_ALLOWED=NO \
@@ -110,7 +118,7 @@ pb=/usr/libexec/PlistBuddy
 if xcrun actool "$repo_root/dist/image/Vita3K.icon" \
         --compile "$app_path" \
         --platform iphoneos \
-        --minimum-deployment-target 17.4 \
+        --minimum-deployment-target 16.5 \
         --target-device iphone --target-device ipad \
         --app-icon Vita3K \
         --output-partial-info-plist "$icon_work/partial.plist" > "$icon_work/actool.log" 2>&1; then
