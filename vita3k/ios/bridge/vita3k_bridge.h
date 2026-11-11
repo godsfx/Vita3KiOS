@@ -42,6 +42,8 @@ int v3k_jit_progress(void);
 int v3k_jit_target(void);
 // Asks the JIT script for executable memory; the app pauses while the debugger works
 void v3k_jit_request(void);
+// Logs the JIT state (iOS version, debugger, pool) with a reason, for diagnosing attach problems
+void v3k_log_jit_state(const char *why);
 const char *v3k_storage_path(void);
 // Folder that holds ux0, vs0, pd0 ... (free with v3k_free_string)
 char *v3k_pref_path(void);

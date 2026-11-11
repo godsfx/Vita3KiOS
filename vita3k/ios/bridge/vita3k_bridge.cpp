@@ -50,6 +50,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -468,14 +469,22 @@ bool v3k_jit_can_request(void) {
     return ios::jit_can_prepare();
 }
 
+void v3k_log_jit_state(const char *why) {
+    LOG_INFO("JIT state ({}): {}", why ? why : "", ios::jit_state_line());
+}
+
 void v3k_jit_request(void) {
     if (jit_preparing.exchange(true))
         return;
+    LOG_INFO("JIT: preparing the region pool. {}", ios::jit_state_line());
     std::thread([] {
-        if (ios::prepare_jit_pool())
-            LOG_INFO("JIT region pool prepared");
+        const auto started = std::chrono::steady_clock::now();
+        const bool ok = ios::prepare_jit_pool();
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+        if (ok)
+            LOG_INFO("JIT region pool prepared in {} ms", ms);
         else
-            LOG_WARN("JIT region pool preparation failed: {}", ios::jit_status_text());
+            LOG_WARN("JIT region pool preparation failed after {} ms: {}. {}", ms, ios::jit_status_text(), ios::jit_state_line());
         jit_preparing = false;
     }).detach();
 }

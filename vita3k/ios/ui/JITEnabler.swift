@@ -92,6 +92,55 @@ enum JITEnabler {
         }
         // Whatever happens next (StikDebug relaunches Vita3K or attaches to it), watch for the debugger
         LibraryHost.watchForJITScript(until: .distantFuture)
+        keepRunningWhileAttaching()
+    }
+
+    private static var attachTask = UIBackgroundTaskIdentifier.invalid
+    private static var requestedAt = Date()
+
+    /// StikDebug has to be in front to attach, which would put Vita3K to sleep before the debugger arrives.
+    /// A short background task keeps Vita3K running, so it notices the debugger and prepares JIT even if
+    /// you are slow to come back (or never do).
+    private static func keepRunningWhileAttaching() {
+        endAttachTask()
+        requestedAt = Date()
+        attachTask = UIApplication.shared.beginBackgroundTask(withName: "Vita3K JIT attach") {
+            MainActor.assumeIsolated {
+                v3k_log_ui("JIT: iOS ended the background time before JIT was ready")
+                endAttachTask()
+            }
+        }
+        v3k_log_jit_state("Enable JIT tapped")
+        var loggedDebugger = false
+        func poll() {
+            guard attachTask != .invalid else { return }
+            let elapsed = Date().timeIntervalSince(requestedAt)
+            let ms = Int(elapsed * 1000)
+            if v3k_is_jit_enabled() {
+                v3k_log_ui("JIT: ready \(ms) ms after Enable JIT")
+                endAttachTask()
+                return
+            }
+            if !loggedDebugger && v3k_jit_can_request() {
+                loggedDebugger = true
+                v3k_log_ui("JIT: the debugger attached \(ms) ms after Enable JIT")
+                v3k_log_jit_state("debugger attached")
+            }
+            if elapsed > 120 {
+                v3k_log_ui("JIT: no debugger after 2 minutes")
+                v3k_log_jit_state("gave up waiting")
+                endAttachTask()
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { poll() }
+        }
+        poll()
+    }
+
+    private static func endAttachTask() {
+        guard attachTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(attachTask)
+        attachTask = .invalid
     }
 
     /// Vita3K's JIT script for StikDebug, written for Vita3K. It speaks the "universal" protocol
@@ -133,7 +182,9 @@ enum JITEnabler {
         const word = send_command(`m${pc.toString(16)},4`) || "";
         const bytes = word.match(/../g);
         const instruction = bytes && bytes.length === 4 ? parseInt(bytes.reverse().join(""), 16) >>> 0 : 0;
-        if ((instruction & 0xffe0001f) !== 0xd4200000 || ((instruction >>> 5) & 0xffff) !== 0xf00d) { resume = passOn; continue; }
+        // (">>> 0": JavaScript's & gives a signed number, which never equals 0xd4200000)
+        const isBrk = ((instruction & 0xffe0001f) >>> 0) === 0xd4200000;
+        if (!isBrk || ((instruction >>> 5) & 0xffff) !== 0xf00d) { resume = passOn; continue; }
         send_command(`P20=${toLittleEndian(pc + 4n)};thread:${thread};`);
         const command = register(reply, "10");
         if (command === 0n) {

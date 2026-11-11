@@ -222,6 +222,11 @@ int main(int argc, char *argv[]) {
             bool background = false;
             unsigned memory_warnings = ios::memory_warning_count();
             bool warned_about_memory = false;
+            // For the summary at the end of the session
+            const auto session_start = last_progress;
+            double fps_total = 0.0, fps_min = 0.0, fps_max = 0.0;
+            int fps_samples = 0, hot_samples = 0, stalls = 0;
+            uint64_t least_memory = os_proc_available_memory();
             const auto record_status = [&](double fps) {
                 ios::crash::session_status(fmt::format("{} MiB of memory left{}{}{}{}",
                     os_proc_available_memory() / (1024 * 1024), fps >= 0.0 ? fmt::format(", {:.1f} FPS", fps) : std::string(), stall_logged ? ", no new frame for 8+ seconds" : "",
@@ -249,6 +254,7 @@ int main(int argc, char *argv[]) {
                     LOG_WARN("Watchdog: no new frame for 8 seconds (the game may be frozen). {} MiB of memory left",
                         os_proc_available_memory() / (1024 * 1024));
                     stall_logged = true;
+                    stalls++;
                     record_status(-1.0);
                 }
                 if (ios::memory_warning_count() != memory_warnings) {
@@ -260,11 +266,21 @@ int main(int argc, char *argv[]) {
                 if (now - last_memory_log > 10s) {
                     // Average frame rate over the last 10 seconds, so a log shows how a game ran
                     const double seconds = std::chrono::duration<double>(now - last_memory_log).count();
-                    const double fps = static_cast<double>(last_frames - frames_at_memory_log) / seconds;
+                    // frames_set starts again from 0 when a game ends: no frames, not a wrapped-around count
+                    const double fps = last_frames >= frames_at_memory_log ? static_cast<double>(last_frames - frames_at_memory_log) / seconds : 0.0;
                     LOG_INFO("Watchdog: {} MiB of memory left, {:.1f} FPS{}{}{}", os_proc_available_memory() / (1024 * 1024), fps,
                         session_paused() ? " (paused)" : "", thermal::phone_is_hot() ? ", phone hot" : "",
                         thermal::low_power_mode() ? ", Low Power Mode" : "");
                     record_status(fps);
+                    if (!session_paused() && !ios::app_in_background() && fps > 0.0) {
+                        fps_total += fps;
+                        fps_min = fps_samples == 0 ? fps : std::min(fps_min, fps);
+                        fps_max = std::max(fps_max, fps);
+                        fps_samples++;
+                        if (thermal::phone_is_hot())
+                            hot_samples++;
+                    }
+                    least_memory = std::min<uint64_t>(least_memory, os_proc_available_memory());
                     last_memory_log = now;
                     frames_at_memory_log = last_frames;
                 }
@@ -290,6 +306,16 @@ int main(int argc, char *argv[]) {
                         logger->flush();
                     _exit(0);
                 }
+            }
+            const double minutes = std::chrono::duration<double>(std::chrono::steady_clock::now() - session_start).count() / 60.0;
+            if (fps_samples > 0) {
+                LOG_INFO("Session summary: {:.1f} min played, {:.1f} FPS on average ({:.1f} lowest, {:.1f} highest, over {} ten-second samples), "
+                         "{} stall{}, {} sample{} with a hot phone, least memory left {} MiB",
+                    minutes, fps_total / fps_samples, fps_min, fps_max, fps_samples, stalls, stalls == 1 ? "" : "s", hot_samples, hot_samples == 1 ? "" : "s",
+                    least_memory / (1024 * 1024));
+            } else {
+                LOG_INFO("Session summary: {:.1f} min, no full ten-second sample of gameplay, {} stall{}, least memory left {} MiB",
+                    minutes, stalls, stalls == 1 ? "" : "s", least_memory / (1024 * 1024));
             }
         });
 

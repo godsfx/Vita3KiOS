@@ -12,6 +12,15 @@
       "bundleIdentifier": "org.vita3k.ios",
       "versions": [
         {
+          "version": "1.3.1",
+          "buildVersion": "159",
+          "date": "2026-11-11T01:55:57Z",
+          "localizedDescription": "RAM helpers: start-up fix, a memory self-test and detailed logs. JIT: Vita3K keeps running while the JIT app attaches, and logs each step. Quitting a game no longer waits for queued shader compiles. Fixed shaders Metal refused. Games that start networking twice no longer fail. More detailed logs, with a summary at the end of every session.\n\n## Install\n- **AltStore / SideStore:** add the source `https://raw.githubusercontent.com/oledz-i/Vita3KiOS/main/dist/altstore/source.json` to get updates in-app.\n- **LiveContainer / TrollStore / other signers:** download `Vita3KiOS-1.3.1.ipa` below.\n\nBuild 159, commit 50ad17a.",
+          "downloadURL": "https://github.com/oledz-i/Vita3KiOS/releases/download/v1.3.1/Vita3KiOS-1.3.1.ipa",
+          "size": 17036008,
+          "minOSVersion": "17.4"
+        },
+        {
           "version": "1.3.0",
           "buildVersion": "149",
           "date": "2026-11-10T12:54:20Z",
@@ -91,11 +100,11 @@
         ],
         "privacy": {}
       },
-      "version": "1.3.0",
-      "versionDate": "2026-11-10T12:54:20Z",
-      "versionDescription": "## Vita3KiOS 1.3.0\n\n### PS Vita home screen (beta, Settings › Appearance)\n- Pages of glossy bubbles you swipe sideways, with page dots and arrows, like a real Vita\n- Information bar with large buttons for Search, Settings, Themes, Music and Library; Content Manager stays on the first page\n- Start screen and LiveAreas you peel away from the top-right corner\n- Each game's own LiveArea (background, gate, frames, manual) from its files; games without one get their artwork and a details strip\n- Seven built-in themes (Frutiger Aero style backgrounds), plus themes and home music from your firmware\n- Smoother, more satisfying taps and transitions\n\n### Memory\n- RAM helpers (beta, Settings › Memory): helper processes lend memory for games, so iOS is less likely to close big games. Works in LiveContainer 3.8.13+ with helper processes turned on\n- RAM checker: device RAM, Vita3K's usage and limit, and what the helpers lend\n\n### Compatibility and fixes\n- Games that write memory from vertex shaders no longer lose those draws on Metal\n- Games that start and end many threads wait briefly for a free JIT region instead of failing\n- Added the memory: device some games use at boot\n- Quitting no longer stalls on network sockets\n- JIT, crash and stability fixes from upstream Vita3K and Vita3K-Plus\n\n## Install\n- **AltStore / SideStore:** add the source `https://raw.githubusercontent.com/oledz-i/Vita3KiOS/main/dist/altstore/source.json` to get updates in-app.\n- **LiveContainer / TrollStore / other signers:** download `Vita3KiOS-1.3.0.ipa` below.\n\nBuild 149, commit 2d31aae.",
-      "downloadURL": "https://github.com/oledz-i/Vita3KiOS/releases/download/v1.3.0/Vita3KiOS-1.3.0.ipa",
-      "size": 17012900
+      "version": "1.3.1",
+      "versionDate": "2026-11-11T01:55:57Z",
+      "versionDescription": "RAM helpers: start-up fix, a memory self-test and detailed logs. JIT: Vita3K keeps running while the JIT app attaches, and logs each step. Quitting a game no longer waits for queued shader compiles. Fixed shaders Metal refused. Games that start networking twice no longer fail. More detailed logs, with a summary at the end of every session.\n\n## Install\n- **AltStore / SideStore:** add the source `https://raw.githubusercontent.com/oledz-i/Vita3KiOS/main/dist/altstore/source.json` to get updates in-app.\n- **LiveContainer / TrollStore / other signers:** download `Vita3KiOS-1.3.1.ipa` below.\n\nBuild 159, commit 50ad17a.",
+      "downloadURL": "https://github.com/oledz-i/Vita3KiOS/releases/download/v1.3.1/Vita3KiOS-1.3.1.ipa",
+      "size": 17036008
     }
   ]
 }

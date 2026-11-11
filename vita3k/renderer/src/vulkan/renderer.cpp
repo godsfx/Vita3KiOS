@@ -26,6 +26,7 @@
 #include <renderer/vulkan/functions.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <renderer/vulkan/state.h>
 
@@ -1155,13 +1156,26 @@ void VKState::cleanup() {
         descriptor.descriptors_idx = 0;
     };
 
+    // Times each step: a slow Quit (Killzone took 5 s here) then names the step in the log
+    auto step_start = std::chrono::steady_clock::now();
+    const auto step_done = [&](const char *step) {
+        const auto now = std::chrono::steady_clock::now();
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - step_start).count();
+        if (ms >= 100)
+            LOG_WARN("Renderer cleanup: {} took {} ms", step, ms);
+        step_start = now;
+    };
+
     tolerate_device_lost("a GPU idle wait", [&] { device.waitIdle(); });
+    step_done("GPU idle wait");
 
     request_queue.abort();
     if (gpu_request_wait_thread.joinable())
         gpu_request_wait_thread.join();
+    step_done("GPU wait thread");
 
     context = nullptr;
+    step_done("context");
 
     for (int i = 0; i < MAX_FRAMES_RENDERING; i++) {
         frames[i].rendered_fences.clear();
@@ -1172,18 +1186,23 @@ void VKState::cleanup() {
         release_descriptor_sets(frames[i].color_descriptor);
     }
 
+    step_done("frame resources");
     pipeline_cache.cleanup();
+    step_done("pipeline cache");
 
     for (int i = 0; i < MAX_FRAMES_RENDERING; i++)
         frames[i].destroy_queue.destroy_objects();
+    step_done("deferred destroys");
 
     screen_renderer.cleanup();
 
     overlay_renderer.destroy();
 
     surface_cache.cleanup();
+    step_done("surface cache");
 
     texture_cache.cleanup();
+    step_done("texture cache");
 
     for (auto &[addr, mapping] : mapped_memories) {
         if (auto *ext = std::get_if<ExternalBuffer>(&mapping.buffer_impl)) {
@@ -1223,11 +1242,14 @@ void VKState::cleanup() {
     device.destroy(multithread_command_pool);
     multithread_command_pool = nullptr;
 
+    step_done("pools");
     allocator.destroy();
+    step_done("allocator");
 
     vkutil::deinit();
 
     device.destroy();
+    step_done("device");
 
     if (debug_messenger) {
         instance.destroyDebugUtilsMessengerEXT(debug_messenger);

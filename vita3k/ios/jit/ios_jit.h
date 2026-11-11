@@ -43,6 +43,9 @@ bool prepare_jit_pool();
 
 std::string jit_status_text();
 
+// Everything that decides whether JIT works, as one line for the log
+std::string jit_state_line();
+
 // Regions prepared so far / regions wanted, for the UI
 int jit_pool_progress();
 int jit_pool_target();

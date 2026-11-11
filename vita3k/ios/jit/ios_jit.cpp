@@ -252,6 +252,18 @@ int jit_pool_available() {
     return -1;
 }
 
+// One line with everything that decides whether JIT works, for the log
+std::string jit_state_line() {
+    uint32_t cs_flags = 0;
+    const int cs_result = csops(getpid(), CS_OPS_STATUS, &cs_flags, sizeof(cs_flags));
+    const bool live_container = getenv("LC_HOME_PATH") != nullptr;
+    return fmt::format("iOS {}, code-signing flags {:#x}{} (debugged: {}), debugger attached: {}, pool ready: {}, pool {}/{}, "
+                       "JIT request unanswered: {}, in LiveContainer: {}",
+        os_major_version(), cs_flags, cs_result == 0 ? "" : " (unreadable)", (cs_flags & CS_DEBUGGED) != 0 ? "yes" : "no",
+        debugger_attached() ? "yes" : "no", jit_pool_ready() ? "yes" : "no", jit_pool_progress(), jit_pool_target(),
+        g_unhandled_universal_jit_breakpoint.load() ? "yes" : "no", live_container ? "yes" : "no");
+}
+
 std::string jit_status_text() {
     if (jit_pool_ready())
         return "JIT ready.";

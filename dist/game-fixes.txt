@@ -29,3 +29,7 @@ PCSE00084 memory-mapping=on native-buffer=on surface-sync=on high-accuracy=off a
 # Same recipe as Madden (GPU-skinned characters): mapping with native buffer and surface sync
 PCSA00017 memory-mapping=on native-buffer=on surface-sync=on async-shaders=on | Memory mapping with Native buffer: Sackboy is drawn by the GPU from mapped memory (invisible with mapping off), and mapping failed at boot only with Double buffer. Surface sync on: grey/white screen without it (Vita3K/compatibility#188). Background shaders for fewer hitches
 PCSF00021 memory-mapping=on native-buffer=on surface-sync=on async-shaders=on | Memory mapping with Native buffer: Sackboy is drawn by the GPU from mapped memory (invisible with mapping off), and mapping failed at boot only with Double buffer. Surface sync on: grey/white screen without it (Vita3K/compatibility#188). Background shaders for fewer hitches
+
+# Killzone Mercenary: same game ran at ~40 FPS with these settings and ~19 FPS with page-table mapping,
+# high accuracy and surface sync on (owner's logs)
+PCSA00107 memory-mapping=on native-buffer=off surface-sync=off high-accuracy=off fps-hack=on cpu-opt=on | Double-buffer memory mapping with surface sync and high accuracy off: about twice the frame rate in testing
