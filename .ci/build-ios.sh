@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 # Vita3KiOS: builds an unsigned IPA with a plain Xcode project.
-#   1. CMake generates Vita3K.xcodeproj
-#   2. xcodebuild builds it (no signing)
-#   3. the .app is zipped into Payload/ as an .ipa
-# Sign/install it with AltStore, SideStore, LiveContainer, TrollStore, etc.
-#
-# Usage: .ci/build-ios.sh <output-dir>
 set -euo pipefail
 
 output_dir="${1:-artifacts}"
@@ -18,8 +12,6 @@ export CMAKE_OSX_DEPLOYMENT_TARGET="${CMAKE_OSX_DEPLOYMENT_TARGET:-16.5}"
 
 : "${VCPKG_ROOT:?VCPKG_ROOT must point at a bootstrapped vcpkg checkout}"
 
-# Results of CMake's feature checks from an earlier build (see ios.yml). With the Xcode generator
-# every check is a slow try-compile, so reusing them cuts configuring from ~10 minutes to seconds.
 seed="${CMAKE_CHECKS_SEED:-}"
 seed_args=()
 if [[ -n "$seed" && -s "$seed" && ! -f "$build_dir/CMakeCache.txt" ]]; then
@@ -39,8 +31,6 @@ cmake ${seed_args[@]+"${seed_args[@]}"} -S "$repo_root" -B "$build_dir" -G Xcode
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
 if [[ -n "$seed" ]]; then
-    # Keep only check results (HAVE_FOO=1 and the like): no paths, no CMake or vcpkg state,
-    # no project options, so a stale seed can never change how the project is set up
     mkdir -p "$(dirname "$seed")"
     python3 - "$build_dir/CMakeCache.txt" "$seed" <<'PY'
 import re, sys
@@ -59,9 +49,6 @@ print(f"Saved {len(entries)} CMake check results")
 PY
 fi
 
-# Route C/C++/Objective-C compiles through ccache when it is installed (CI restores its cache).
-# Precompiled headers are off above: a rebuilt PCH never matches the cache, so every file using it
-# would miss.
 ccache_args=()
 if command -v ccache > /dev/null; then
     ccache_args=(
@@ -77,6 +64,9 @@ xcodebuild \
     -configuration "$config" \
     -sdk iphoneos \
     IPHONEOS_DEPLOYMENT_TARGET=16.5 \
+    SWIFT_DEPLOYMENT_TARGET=16.5 \
+    SWIFT_ENABLE_EXPLICIT_MODULE_BUILD=NO \
+    OTHER_SWIFT_FLAGS="-Xfrontend -disable-availability-checking" \
     -parallelizeTargets \
     -jobs "$(sysctl -n hw.ncpu)" \
     CODE_SIGNING_ALLOWED=NO \
@@ -93,7 +83,6 @@ fi
 echo "Built: $app_path"
 
 # ---- RAM helper extension (V3KRamHelper.appex) ----
-# CMake embeds it in PlugIns; copy it there if this Xcode didn't
 if [[ ! -d "$app_path/PlugIns/V3KRamHelper.appex" ]]; then
     appex_path="$(find "$build_dir" -name 'V3KRamHelper.appex' -type d -path "*${config}-iphoneos*" -not -path "*/PlugIns/*" | head -n 1)"
     if [[ -n "$appex_path" ]]; then
@@ -106,12 +95,11 @@ if [[ ! -d "$app_path/PlugIns/V3KRamHelper.appex" ]]; then
     fi
 fi
 
-# ---- App icon: the official Vita3K icon ----
+# ---- App icon ----
 icon_work="$(mktemp -d)"
 plist="$app_path/Info.plist"
 pb=/usr/libexec/PlistBuddy
 
-# 1. Liquid Glass icon compiled from the Icon Composer file (dist/image/Vita3K.icon)
 if xcrun actool "$repo_root/dist/image/Vita3K.icon" \
         --compile "$app_path" \
         --platform iphoneos \
@@ -126,7 +114,6 @@ else
     cat "$icon_work/actool.log"
 fi
 
-# 2. PNG fallbacks (LiveContainer, older iOS): the logo on the icon's orange gradient
 python3 - "$repo_root/vita3k/org.vita3k.vita3k.svg" "$icon_work/icon.svg" <<'PY'
 import sys
 svg = open(sys.argv[1]).read()
