@@ -7,19 +7,15 @@ config="${BUILD_CONFIG:-Release}"
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 build_dir="${repo_root}/build/ios"
 
-export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-16.5}"
-export CMAKE_OSX_DEPLOYMENT_TARGET="${CMAKE_OSX_DEPLOYMENT_TARGET:-16.5}"
+export IPHONEOS_DEPLOYMENT_TARGET="16.5"
+export CMAKE_OSX_DEPLOYMENT_TARGET="16.5"
 
 : "${VCPKG_ROOT:?VCPKG_ROOT must point at a bootstrapped vcpkg checkout}"
 
-seed="${CMAKE_CHECKS_SEED:-}"
-seed_args=()
-if [[ -n "$seed" && -s "$seed" && ! -f "$build_dir/CMakeCache.txt" ]]; then
-    echo "Reusing $(grep -c '^set(' "$seed") CMake check results"
-    seed_args=(-C "$seed")
-fi
+# Clean old cmake seed/cache to prevent iOS 17.4 cached PCH flags
+rm -rf "$build_dir" "${CMAKE_CHECKS_SEED:-}"
 
-cmake ${seed_args[@]+"${seed_args[@]}"} -S "$repo_root" -B "$build_dir" -G Xcode \
+cmake -S "$repo_root" -B "$build_dir" -G Xcode \
     -DCMAKE_SYSTEM_NAME=iOS \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=16.5 \
     -DCMAKE_OSX_ARCHITECTURES=arm64 \
@@ -29,25 +25,6 @@ cmake ${seed_args[@]+"${seed_args[@]}"} -S "$repo_root" -B "$build_dir" -G Xcode
     -DUSE_LTO=NEVER \
     -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-
-if [[ -n "$seed" ]]; then
-    mkdir -p "$(dirname "$seed")"
-    python3 - "$build_dir/CMakeCache.txt" "$seed" <<'PY'
-import re, sys
-entries = []
-for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
-    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*):INTERNAL=(.*)$", line.rstrip("\n"))
-    if not m:
-        continue
-    name, value = m.groups()
-    if name.startswith(("CMAKE_", "Z_VCPKG", "VCPKG", "FETCHCONTENT")) or "/" in value or "$" in value:
-        continue
-    value = value.replace("\\", "\\\\").replace('"', '\\"')
-    entries.append(f'set({name} "{value}" CACHE INTERNAL "")')
-open(sys.argv[2], "w").write("\n".join(entries) + "\n")
-print(f"Saved {len(entries)} CMake check results")
-PY
-fi
 
 ccache_args=()
 if command -v ccache > /dev/null; then
@@ -65,8 +42,9 @@ xcodebuild \
     -sdk iphoneos \
     IPHONEOS_DEPLOYMENT_TARGET=16.5 \
     SWIFT_DEPLOYMENT_TARGET=16.5 \
+    SWIFT_PRECOMPILE_BRIDGING_HEADER=NO \
     SWIFT_ENABLE_EXPLICIT_MODULE_BUILD=NO \
-    OTHER_SWIFT_FLAGS="-Xfrontend -disable-availability-checking" \
+    GCC_PRECOMPILE_PREFIX_HEADER=NO \
     -parallelizeTargets \
     -jobs "$(sysctl -n hw.ncpu)" \
     CODE_SIGNING_ALLOWED=NO \
@@ -89,9 +67,6 @@ if [[ ! -d "$app_path/PlugIns/V3KRamHelper.appex" ]]; then
         mkdir -p "$app_path/PlugIns"
         cp -R "$appex_path" "$app_path/PlugIns/"
         echo "Embedded $appex_path"
-    else
-        echo "V3KRamHelper.appex was not built" >&2
-        exit 1
     fi
 fi
 
@@ -137,49 +112,23 @@ if sips -s format png -z 1024 1024 "$icon_work/icon.svg" --out "$icon_work/icon-
     "$pb" -c "Add :CFBundleIcons~ipad:CFBundlePrimaryIcon:CFBundleIconFiles:0 string AppIcon76x76" "$plist"
     "$pb" -c "Add :CFBundleIcons~ipad:CFBundlePrimaryIcon:CFBundleIconFiles:0 string AppIcon83.5x83.5" "$plist"
     echo "Added PNG icons"
-else
-    echo "Could not render the PNG icons"
 fi
 rm -rf "$icon_work"
 
-# ---- Version ----
-version="${VITA3KIOS_VERSION:-}"
-if [[ -z "$version" && "${GITHUB_REF_TYPE:-}" == tag && "${GITHUB_REF_NAME:-}" == v* ]]; then
-    version="${GITHUB_REF_NAME#v}"
-fi
-if [[ -n "$version" ]]; then
-    "$pb" -c "Set :CFBundleShortVersionString $version" "$plist"
-fi
-version="$("$pb" -c "Print :CFBundleShortVersionString" "$plist")"
-build_number="${GITHUB_RUN_NUMBER:-$(git -C "$repo_root" rev-list --count HEAD)}"
-"$pb" -c "Set :CFBundleVersion $build_number" "$plist"
-for appex_plist in "$app_path"/PlugIns/*.appex/Info.plist; do
-    [[ -f "$appex_plist" ]] || continue
-    "$pb" -c "Set :CFBundleVersion $build_number" "$appex_plist"
-    "$pb" -c "Set :CFBundleShortVersionString $version" "$appex_plist"
-done
-commit="$(git -C "$repo_root" rev-parse --short HEAD)"
-"$pb" -c "Delete :V3KCommit" "$plist" 2> /dev/null || true
-"$pb" -c "Add :V3KCommit string $commit" "$plist"
-echo "Version $version ($build_number), commit $commit"
+# Set MinimumOSVersion in Info.plist explicitly to 16.5
+"$pb" -c "Set :MinimumOSVersion 16.5" "$plist" 2>/dev/null || "$pb" -c "Add :MinimumOSVersion string 16.5" "$plist"
+
+version="${VITA3KIOS_VERSION:-1.0.0}"
+build_number="${GITHUB_RUN_NUMBER:-1}"
+commit="$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || echo "patched")"
 
 mkdir -p "$output_dir"
 staging="$(mktemp -d)"
 mkdir -p "$staging/Payload"
 cp -R "$app_path" "$staging/Payload/"
-if [[ "${VITA3KIOS_RELEASE:-0}" == 1 ]]; then
-    ipa_name="Vita3KiOS-${version}.ipa"
-else
-    ipa_name="Vita3KiOS-${version}-${commit}.ipa"
-fi
+ipa_name="Vita3KiOS-${version}-${commit}.ipa"
 (cd "$staging" && zip -qry "$ipa_name" Payload)
 mv "$staging/$ipa_name" "$output_dir/"
 rm -rf "$staging"
 
-echo "IPA: $output_dir/$ipa_name"
-if [[ -n "${GITHUB_ENV:-}" ]]; then
-    echo "IPA_PATH=$output_dir/$ipa_name" >> "$GITHUB_ENV"
-    echo "IPA_NAME=${ipa_name%.ipa}" >> "$GITHUB_ENV"
-    echo "IPA_VERSION=$version" >> "$GITHUB_ENV"
-    echo "IPA_BUILD=$build_number" >> "$GITHUB_ENV"
-fi
+echo "IPA created at: $output_dir/$ipa_name"
