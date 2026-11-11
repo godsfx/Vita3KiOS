@@ -46,18 +46,15 @@ if [[ -n "$seed" ]]; then
 import re, sys
 entries = []
 for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
-    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*):INTERNAL=(.*)$", line.rstrip("
-"))
+    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*):INTERNAL=(.*)$", line.rstrip("\n"))
     if not m:
         continue
     name, value = m.groups()
     if name.startswith(("CMAKE_", "Z_VCPKG", "VCPKG", "FETCHCONTENT")) or "/" in value or "$" in value:
         continue
-    value = value.replace(chr(92), chr(92) + chr(92)).replace(chr(34), chr(92) + chr(34))
+    value = value.replace("\\", "\\\\").replace('"', '\\"')
     entries.append(f'set({name} "{value}" CACHE INTERNAL "")')
-open(sys.argv[2], "w").write("
-".join(entries) + "
-")
+open(sys.argv[2], "w").write("\n".join(entries) + "\n")
 print(f"Saved {len(entries)} CMake check results")
 PY
 fi
